@@ -11,6 +11,7 @@ pub mod solquad {
         escrow_account.escrow_creator = ctx.accounts.escrow_signer.key();
         escrow_account.creator_deposit_amount = amount;
         escrow_account.total_projects = 0;
+        escrow_account.project_reciever_addresses = Vec::new();
 
         Ok(())
     }
@@ -20,6 +21,7 @@ pub mod solquad {
         pool_account.pool_creator = ctx.accounts.pool_signer.key();
         pool_account.total_projects = 0;
         pool_account.total_votes = 0;
+        pool_account.projects = Vec::new();
 
         Ok(())
     }
@@ -73,8 +75,8 @@ pub mod solquad {
         let escrow_account = &mut ctx.accounts.escrow_account;
         let pool_account = &mut ctx.accounts.pool_account;
         let project_account = &mut ctx.accounts.project_account;
-  
-        for i in 0..escrow_account.project_reciever_addresses.len() {
+
+        for i in 0..pool_account.projects.len() {
             let distributable_amt: u64;
             let votes: u64;
 
@@ -85,8 +87,8 @@ pub mod solquad {
                 votes = 0;
             }
 
-            if votes != 0 {
-                distributable_amt = (votes / pool_account.total_votes) * escrow_account.creator_deposit_amount as u64;
+            if pool_account.total_votes != 0 && votes != 0 {
+                distributable_amt = (votes as u128 * escrow_account.creator_deposit_amount as u128 / pool_account.total_votes as u128) as u64;
             } else {
                 distributable_amt = 0;
             }
@@ -148,7 +150,7 @@ pub struct InitializeProject<'info> {
 pub struct AddProjectToPool<'info> {
     #[account(mut)]
     pub escrow_account: Account<'info, Escrow>,
-    #[account(mut)]
+    #[account(mut, has_one = pool_creator)]
     pub pool_account: Account<'info, Pool>,
     pub project_account: Account<'info, Project>,
     pub project_owner: Signer<'info>,
@@ -156,7 +158,7 @@ pub struct AddProjectToPool<'info> {
 
 #[derive(Accounts)]
 pub struct VoteForProject<'info> {
-    #[account(mut)]
+    #[account(mut, has_one = pool_creator)]
     pub pool_account: Account<'info, Pool>,
     #[account(mut)]
     pub project_account: Account<'info, Project>,
@@ -170,7 +172,7 @@ pub struct DistributeEscrowAmount<'info> {
     pub escrow_creator: Signer<'info>,
     #[account(mut, has_one = escrow_creator)]
     pub escrow_account: Account<'info, Escrow>,
-    #[account(mut)]
+    #[account(mut, has_one = pool_creator)]
     pub pool_account: Account<'info, Pool>,
     #[account(mut)]
     pub project_account: Account<'info, Project>,
